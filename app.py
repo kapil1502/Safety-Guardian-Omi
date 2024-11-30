@@ -1,55 +1,26 @@
 import os
+import sys
 import logging
 import traceback
 from typing import Dict, Any, Optional
+
+# Add project root to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from flask import Flask, request, jsonify
-import requests
-import re
+import dateutil.parser
 
 class OMIIntegrationWebhook:
     def __init__(self):
-        # Logging configuration
-        self._setup_logging()
+        # Logging configuration (simplified for serverless)
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger('omi_integration')
         
         # Configuration variables
         self.emergency_keywords = [
             'help', 'emergency', 'danger', 'attacked', 
             'threat', 'scared', 'in trouble', 'omi help'
         ]
-        
-        # External service configuration (placeholder)
-        self.external_services = {
-            'emergency_contact': None,
-            'location_service': None,
-            'monitoring_service': None
-        }
-    
-    def _setup_logging(self):
-        """
-        Configure logging with multiple handlers
-        """
-        # Create logger
-        self.logger = logging.getLogger('omi_integration')
-        self.logger.setLevel(logging.DEBUG)
-        
-        # Console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        
-        # File handler
-        file_handler = logging.FileHandler('omi_integration.log')
-        file_handler.setLevel(logging.DEBUG)
-        
-        # Formatter
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        console_handler.setFormatter(formatter)
-        file_handler.setFormatter(formatter)
-        
-        # Add handlers
-        self.logger.addHandler(console_handler)
-        self.logger.addHandler(file_handler)
     
     def validate_webhook_payload(self, payload: Dict[str, Any]) -> bool:
         """
@@ -71,7 +42,6 @@ class OMIIntegrationWebhook:
                 return False
             
             # Validate timestamp format
-            import dateutil.parser
             dateutil.parser.parse(payload['created_at'])
         
         except Exception as e:
@@ -83,10 +53,6 @@ class OMIIntegrationWebhook:
     def detect_emergency_context(self, transcript: str) -> Optional[Dict[str, Any]]:
         """
         Detect emergency context within the transcript
-        
-        Returns:
-        - None if no emergency detected
-        - Dict with emergency details if detected
         """
         # Normalize transcript
         normalized_transcript = transcript.lower()
@@ -113,7 +79,6 @@ class OMIIntegrationWebhook:
         """
         Calculate confidence level of emergency detection
         """
-        # Simple confidence calculation
         matched_keywords = sum(
             1 for keyword in self.emergency_keywords 
             if keyword in transcript
@@ -150,9 +115,6 @@ class OMIIntegrationWebhook:
                     f"Confidence {emergency_context['confidence']} "
                     f"Keywords: {emergency_context['keywords_matched']}"
                 )
-                
-                # Trigger emergency protocol
-                self._handle_emergency_protocol(payload, emergency_context)
             
             # Process additional memory creation logic
             processed_result = {
@@ -177,47 +139,6 @@ class OMIIntegrationWebhook:
                 'error_code': 500
             }
     
-    def _handle_emergency_protocol(self, payload: Dict[str, Any], emergency_context: Dict[str, Any]):
-        """
-        Execute emergency response protocol
-        """
-        try:
-            # Placeholder for emergency response
-            # In a real implementation, this would:
-            # 1. Notify emergency contacts
-            # 2. Attempt to contact authorities
-            # 3. Share location information
-            
-            emergency_details = {
-                'memory_id': payload.get('id'),
-                'transcript': payload.get('transcript'),
-                'emergency_type': emergency_context.get('type'),
-                'confidence': emergency_context.get('confidence')
-            }
-            
-            self.logger.critical(f"EMERGENCY PROTOCOL ACTIVATED: {emergency_details}")
-            
-            # Simulated notifications (replace with actual implementations)
-            self._notify_emergency_contacts(emergency_details)
-            self._log_emergency_event(emergency_details)
-        
-        except Exception as e:
-            self.logger.error(f"Emergency Protocol Execution Failed: {e}")
-    
-    def _notify_emergency_contacts(self, emergency_details: Dict[str, Any]):
-        """
-        Notify predefined emergency contacts
-        """
-        # Placeholder for contact notification logic
-        pass
-    
-    def _log_emergency_event(self, emergency_details: Dict[str, Any]):
-        """
-        Log emergency event to external monitoring service
-        """
-        # Placeholder for external logging
-        pass
-    
     def _extract_additional_metadata(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
         Extract additional metadata from the payload
@@ -228,25 +149,25 @@ class OMIIntegrationWebhook:
             'total_segments': len(payload.get('transcript_segments', []))
         }
 
-# Flask Application Setup
-app = Flask(__name__)
+# Create webhook handler
 webhook_handler = OMIIntegrationWebhook()
 
-@app.route('/webhook', methods=['POST'])
+# Flask Application for Vercel
+app = Flask(__name__)
+
 def process_webhook():
     """
     Main webhook endpoint for processing OMI triggers
     """
     try:
         # Validate request
-        if not request.is_json:
+        payload = request.get_json()
+        
+        if not payload:
             return jsonify({
                 'status': 'error',
                 'message': 'Invalid request format'
             }), 400
-        
-        # Parse incoming payload
-        payload = request.get_json()
         
         # Process memory creation trigger
         result = webhook_handler.process_memory_creation_trigger(payload)
@@ -268,14 +189,14 @@ def process_webhook():
             'details': str(e)
         }), 500
 
-# Error Handlers
-@app.errorhandler(400)
-def bad_request(error):
-    return jsonify({'status': 'error', 'message': 'Bad Request'}), 400
-
-@app.errorhandler(500)
-def server_error(error):
-    return jsonify({'status': 'error', 'message': 'Internal Server Error'}), 500
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+# Vercel requires a function named `app`
+def app(event, context):
+    # For POST requests to the webhook
+    if event['httpMethod'] == 'POST':
+        return process_webhook()
+    
+    # Handle other HTTP methods
+    return {
+        'statusCode': 405,
+        'body': 'Method Not Allowed'
+    }
