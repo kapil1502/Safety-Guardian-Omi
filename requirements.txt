@@ -1,0 +1,37 @@
+# Core Web Framework
+flask==3.0.0
+flask-cors==4.0.0
+gunicorn==21.2.0
+
+# Date and Time Handling
+python-dateutil==2.8.2
+pytz==2024.1
+
+# Logging and Monitoring
+structlog==24.1.0
+
+# Request Handling
+requests==2.31.0
+urllib3==2.2.1
+
+# Error Tracking and Monitoring (Optional)
+# sentry-sdk==1.40.5
+
+# Security
+cryptography==42.0.5
+python-dotenv==1.0.0
+
+# Development and Debugging
+pytest==8.0.2
+pytest-flask==1.3.0
+
+# Type Checking
+typing_extensions==4.10.0
+
+# Optional: Add any external service libraries
+# twilio==8.9.0  # For emergency contact SMS
+# geopy==2.4.1   # For location services
+
+# Performance and WSGI
+gevent==24.2.1
+werkzeug==3.0.1
